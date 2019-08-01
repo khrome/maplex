@@ -8,55 +8,67 @@ var ready = function(mappables, cb){
         if(cb) cb();
     }, 0);
 };
+// TODO: rewrite to stream
+var Maplex = function(){};
 
-var Maplex = {
-    map : function(){
-        var mappables = Array.prototype.slice.call(arguments);
-        var mapFn = mappables.pop();
-        var completeFn;
-        if(typeof mappables[mappables.length-1] === 'function'){
-            completeFn = mapFn;
-            mapFn = mappables.pop();
+Maplex.convert = function(mappable){
+    return mappable;
+}
+
+Maplex.map = function(){
+    var mappables = Array.prototype.slice.call(arguments);
+    var mapFn = mappables.pop();
+    var completeFn;
+    if(typeof mappables[mappables.length-1] === 'function'){
+        completeFn = mapFn;
+        mapFn = mappables.pop();
+    }
+    mappables = mappables.map( this.convert || Maplex.convert );
+    mappables = mappables.map( item => new Maplex.Iterable(item) );
+    var row;
+    var results = [];
+    ready(mappables, function(){
+        row = [];
+        triggers = [];
+        var isRowDone = function(row){
+            //this can handle out of order insertion
+            return row.reduce(
+                ((agg, value) => agg + value != null?agg+1:agg), 0
+            ) === mappables.length;
         }
-        mappables = mappables.map( item => new Maplex.Iterable(item) );
-        var row;
-        var results = [];
-        ready(mappables, function(){
-            row = [];
-            triggers = [];
-            var isRowDone = function(row){
-                //this can handle out of order insertion
-                return row.reduce(
-                    ((agg, value) => agg + value != null?agg+1:agg), 0
-                ) === mappables.length;
-            }
-            var itemsProxy = new Array(mappables[0].length);
-            asynk.eachOf(itemsProxy, function(notForUse, itemIndex, allDone){
-                asynk.eachOf(mappables, function(mappable, mappableIndex, done){
-                    mappable.next(function(item){
-                        triggers.push(done);
-                        row[mappableIndex] = item;
-                        if(isRowDone(row)){
-                            row.push(function(){ done() });
-                            var result = mapFn.apply({}, row);
-                            var dones = triggers;
-                            row = [];
-                            triggers = [];
-                            if(completeFn){
-                                results[itemIndex] = result;
-                            }
-                            dones.forEach( done => done());
+        var itemsProxy = new Array(mappables[0].length);
+        asynk.eachOf(itemsProxy, function(notForUse, itemIndex, allDone){
+            asynk.eachOf(mappables, function(mappable, mappableIndex, done){
+                mappable.next(function(item){
+                    triggers.push(done);
+                    row[mappableIndex] = item;
+                    if(isRowDone(row)){
+                        row.push(function(){ done() });
+                        var result = mapFn.apply({}, row);
+                        var dones = triggers;
+                        row = [];
+                        triggers = [];
+                        if(completeFn){
+                            results[itemIndex] = result;
                         }
-                    });
-                }, function(){
-                    allDone();
+                        dones.forEach( done => done());
+                    }
                 });
             }, function(){
-                if(completeFn) completeFn(results);
+                allDone();
             });
+        }, function(){
+            if(completeFn) completeFn(results);
         });
-    }
+    });
 }
+
+Maplex.prototype = {
+    convert : Maplex.convert,
+    map : Maplex.map
+}
+
+Maplex.prototype.constructor = Maplex;
 
 Maplex.Iterable = function(iterable){
     this.iterable = iterable;
