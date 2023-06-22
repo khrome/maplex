@@ -1,5 +1,6 @@
-var should = require("chai").should();
-var Maplex = require('./maplex');
+import { chai } from 'environment-safe-chai';
+import { Maplex } from './maplex.mjs';
+const should = chai.should();
 
 describe('Maplex', function(){
     describe('should map over simple arrays', function(){

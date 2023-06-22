@@ -131,6 +131,7 @@ Maplex.Iterable.prototype.next = function(cb){
     }
 }
 
+Maplex.Maplex = Maplex;
 return Maplex;
 
 }));
